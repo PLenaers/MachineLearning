@@ -1,0 +1,10 @@
+base
+foreach
+iterators
+doParallel
+lattice
+ggplot2
+caret
+rattle
+rpart
+randomForest

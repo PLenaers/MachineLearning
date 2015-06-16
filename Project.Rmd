@@ -1,0 +1,75 @@
+---
+title: 'Machine Learning: Quantified self movement'
+author: "Peter Lenaers"
+date: "15 Jun 2015"
+output: html_document
+---
+
+
+## Synopsis
+In this report, random forest are used to predict the way barbell lifts are performed. Data from accelerometers on the belt, forearm, arm, and dumbbell are used for these predictions. For the sake of cross validation, the training data set is split up in to a training set of only a quarter of the original, and a test data set (75% of the original) to see how well the model performs. Even with this small a data set, the model is 98% accurate on the test data, meaning that no further model improvement is necessary.
+
+## Data processing
+Firstly, the databases are downloaded if not already and loaded into memory.
+
+```{r dataProcessing, cache=TRUE}
+if (!file.exists("pml-training.csv")) {
+      fileURL = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+      download.file(fileURL, destfile="pml-training.csv", method="curl") 
+}
+if (!file.exists("pml-testing.csv")) {
+      fileURL = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+      download.file(fileURL, destfile="pml-testing.csv", method="curl") 
+}
+
+testing = read.csv2("pml-testing.csv", sep=",", stringsAsFactors=FALSE)
+training = read.csv2("pml-training.csv", sep=",", stringsAsFactors=FALSE)
+```
+
+There are quite a few predictors with a lot of NA's. These we discard together with columns we don't need like the username of the participant, starting time,.... After this, we divide the training set into a training (25%) and a testing set (75%) to allow for cross validation.
+
+```{r dataSelect, message=F, warning=F}
+library(caret)
+library(rattle)
+library(rpart)
+library(randomForest)
+
+newdata <- training
+newdata[newdata==""] <- NA
+newdata <- newdata[, colSums(is.na(newdata)) == 0]
+newdata <- newdata[, -c(1:7)]
+newdata[,1:52] <- data.frame(lapply(newdata[,1:52],as.numeric))
+newdata$classe <- as.factor(newdata$classe)
+myvars <- names(newdata)
+
+set.seed(13)
+inTrain <- createDataPartition(newdata$classe, p=0.25, list=FALSE)
+myTraining <- newdata[inTrain,]
+myTesting <- newdata[-inTrain,]
+```
+
+We use random forests on a standardised data set to investigate how well the method performs.
+
+```{r model, cache=TRUE}
+modFit <- train(classe ~ ., data=myTraining, preProcess=c("center","scale"), method = "rf")
+preds <- predict(modFit, newdata=myTraining)
+confusionMatrix(myTraining$classe, preds)
+```
+
+Even though we only used a quarter of the observations, this method works perfectly on the training set. But because of the out of sample error the accuracy of the method when applied to the test set is probably a bit lower.
+
+```{r test}
+preds <- predict(modFit, newdata=myTesting)
+confusionMatrix(myTesting$classe, preds)
+```
+
+We indeed see that the accuracy now is 98%, still pretty impressive so there is no need to improve the model.
+Finally, we use the model to predict the outcome of the testing data.
+
+```{r final}
+finalTest <- testing[,myvars[-53]]
+finalTest <- data.frame(lapply(finalTest,as.numeric))
+answers <- predict(modFit, newdata=finalTest)
+```
+
+So the predictions for the 20 cases are `r answers`. When we upload these solutions online we see that all 20 are correct.
